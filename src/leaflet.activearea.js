@@ -73,7 +73,7 @@ L.Map.include({
 
     setView: function (center, zoom, options) {
         center = L.latLng(center);
-        zoom = zoom === undefined ? this._zoom : this._limitZoom(zoom);
+        zoom = zoom || this.getZoom();
 
         if (this.getViewport()) {
             var point = this.project(center, this._limitZoom(zoom));
@@ -152,13 +152,15 @@ L.Map.include({
 });
 
 L.Renderer.include({
-    _updateTransform: function () {
-        var zoom = this._map.getZoom(),
-            center = this._map.getCenter(true),
-            scale = this._map.getZoomScale(zoom, this._zoom),
-            offset = this._map._latLngToNewLayerPoint(this._topLeft, zoom, center);
-
-        L.DomUtil.setTransform(this._container, offset, scale);
+    _updateTransform: function (center, zoom) {
+        var scale = this._map.getZoomScale(zoom, this._zoom);
+        var position = L.DomUtil.getPosition(this._container),
+            viewHalf = this._map.getSize().multiplyBy(0.5 + this.options.padding),
+            currentCenterPoint = this._map.project(this._center, zoom),
+            destCenterPoint = this._map.project(center, zoom),
+            centerOffset = destCenterPoint.subtract(currentCenterPoint),
+            topLeftOffset = viewHalf.multiplyBy(-scale).add(position).add(viewHalf).subtract(centerOffset);
+      L.DomUtil.setTransform(this._container, topLeftOffset, scale);
     }
 });
 
@@ -264,57 +266,6 @@ L.GridLayer.include({
             }
 
             this._level.el.appendChild(fragment);
-        }
-    }
-});
-
-L.Popup.include({
-    _adjustPan: function () {
-        if (!this._map._viewport) {
-            previousMethods.PopupAdjustPan.call(this);
-        } else {
-            if (!this.options.autoPan) { return; }
-
-            var map = this._map,
-                vp = map._viewport,
-                containerHeight = this._container.offsetHeight,
-                containerWidth = this._containerWidth,
-                vpTopleft = L.point(vp.offsetLeft, vp.offsetTop),
-
-                layerPos = new L.Point(
-                    this._containerLeft - vpTopleft.x,
-                    - containerHeight - this._containerBottom - vpTopleft.y);
-
-            if (this._zoomAnimated) {
-                layerPos._add(L.DomUtil.getPosition(this._container));
-            }
-
-            var containerPos = map.layerPointToContainerPoint(layerPos),
-                padding = L.point(this.options.autoPanPadding),
-                paddingTL = L.point(this.options.autoPanPaddingTopLeft || padding),
-                paddingBR = L.point(this.options.autoPanPaddingBottomRight || padding),
-                size = L.point(vp.clientWidth, vp.clientHeight),
-                dx = 0,
-                dy = 0;
-
-            if (containerPos.x + containerWidth + paddingBR.x > size.x) { // right
-                dx = containerPos.x + containerWidth - size.x + paddingBR.x;
-            }
-            if (containerPos.x - dx - paddingTL.x < 0) { // left
-                dx = containerPos.x - paddingTL.x;
-            }
-            if (containerPos.y + containerHeight + paddingBR.y > size.y) { // bottom
-                dy = containerPos.y + containerHeight - size.y + paddingBR.y;
-            }
-            if (containerPos.y - dy - paddingTL.y < 0) { // top
-                dy = containerPos.y - paddingTL.y;
-            }
-
-            if (dx || dy) {
-                map
-                    .fire('autopanstart')
-                    .panBy([dx, dy]);
-            }
         }
     }
 });
