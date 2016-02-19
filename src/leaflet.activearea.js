@@ -79,6 +79,13 @@ L.Map.include({
             var point = this.project(center, this._limitZoom(zoom));
             point = point.add(this.getOffset());
             center = this.unproject(point, this._limitZoom(zoom));
+            
+            // don't animate initial setView
+            if (!options) {
+                options = {
+                    animate: false
+                };
+            }
         }
 
         return previousMethods.setView.call(this, center, zoom, options);
